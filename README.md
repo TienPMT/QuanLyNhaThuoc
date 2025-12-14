@@ -14,7 +14,6 @@ Phần mềm quản lý nhà thuốc với đầy đủ chức năng quản lý 
 - [Cài đặt](#-cài-đặt)
 - [Cấu trúc dự án](#-cấu-trúc-dự-án)
 - [Hướng dẫn sử dụng](#-hướng-dẫn-sử-dụng)
-- [Screenshots](#-screenshots)
 - [Phân quyền](#-phân-quyền)
 - [Đóng góp](#-đóng-góp)
 - [Tác giả](#-tác-giả)
@@ -307,7 +306,7 @@ Mọi đóng góp đều được chào đón! Vui lòng làm theo các bước 
 ## 👨‍💻 Tác giả
 
 **Tên tác giả**
-- GitHub: [@TienPMT](https://github.com/yourusername)
+- GitHub: [@TienPMT](https://github.com/TienPMT)
 - Email: minhtienvvt7@gmail.com
 
 ## 🙏 Cảm ơn
