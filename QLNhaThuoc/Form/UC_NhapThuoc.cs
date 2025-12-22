@@ -8,65 +8,11 @@ namespace QLNhaThuoc.Form
 {
     public partial class UC_NhapThuoc : UserControl
     {
-        // [MỚI] Menu chuột phải
-        private ContextMenuStrip contextMenuStatus;
-
         public UC_NhapThuoc()
         {
             InitializeComponent();
-            // [MỚI] Khởi tạo menu
-            KhoiTaoMenuTrangThai();
             LoadData();
             SetupEvents();
-        }
-
-        // [MỚI] Hàm tạo Menu chuột phải
-        private void KhoiTaoMenuTrangThai()
-        {
-            contextMenuStatus = new ContextMenuStrip();
-
-            var itemDuyet = new ToolStripMenuItem("✅ Duyệt phiếu (Đã nhập kho)");
-            itemDuyet.Click += (s, e) => CapNhatTrangThai("Đã nhập kho");
-
-            var itemHuy = new ToolStripMenuItem("❌ Hủy phiếu");
-            itemHuy.Click += (s, e) => CapNhatTrangThai("Đã hủy");
-
-            var itemCho = new ToolStripMenuItem("⏳ Đặt lại Chờ duyệt");
-            itemCho.Click += (s, e) => CapNhatTrangThai("Chờ duyệt");
-
-            contextMenuStatus.Items.AddRange(new ToolStripItem[] { itemDuyet, itemHuy, new ToolStripSeparator(), itemCho });
-        }
-
-        // [MỚI] Hàm cập nhật DB
-        private void CapNhatTrangThai(string trangThaiMoi)
-        {
-            string maPhieu = txtMaPhieu.Text.Trim();
-            if (string.IsNullOrEmpty(maPhieu)) return;
-
-            if (MessageBox.Show($"Bạn muốn đổi trạng thái phiếu [{maPhieu}] thành: {trangThaiMoi}?",
-                                "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
-                return;
-
-            try
-            {
-                using (var db = new DbThuocContext())
-                {
-                    var pn = db.PhieuNhaps.Find(maPhieu);
-                    if (pn != null)
-                    {
-                        pn.TrangThai = trangThaiMoi;
-                        db.SaveChanges();
-
-                        MessageBox.Show("Cập nhật trạng thái thành công!");
-                        LoadData(); // Load lại lưới
-                        txtGhiChu.Text = trangThaiMoi; // Cập nhật text hiển thị
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Lỗi: " + ex.Message);
-            }
         }
 
         private void LoadData()
@@ -109,26 +55,6 @@ namespace QLNhaThuoc.Form
                     DoDuLieuVaoInput(e.RowIndex);
                 }
             };
-
-            // [MỚI] Sự kiện Click chuột phải để hiện Menu
-            dgvKhoHang.MouseClick += (s, e) => {
-                if (e.Button == MouseButtons.Right)
-                {
-                    int currentMouseOverRow = dgvKhoHang.HitTest(e.X, e.Y).RowIndex;
-                    if (currentMouseOverRow >= 0)
-                    {
-                        // Chọn dòng được click chuột phải
-                        dgvKhoHang.ClearSelection();
-                        dgvKhoHang.Rows[currentMouseOverRow].Selected = true;
-
-                        // Đổ dữ liệu vào textbox (để lấy mã phiếu)
-                        DoDuLieuVaoInput(currentMouseOverRow);
-
-                        // Hiển thị menu
-                        contextMenuStatus.Show(dgvKhoHang, new System.Drawing.Point(e.X, e.Y));
-                    }
-                }
-            };
         }
 
         // [CẬP NHẬT] Sử dụng tên cột thay vì index để tránh lỗi khi thứ tự cột thay đổi
@@ -140,7 +66,6 @@ namespace QLNhaThuoc.Form
             txtMaPhieu.Text = row.Cells["colMaPhieu"].Value?.ToString() ?? "";
             txtNhanVien.Text = row.Cells["colNhanVien"].Value?.ToString() ?? "";
             txtNhaCungCap.Text = row.Cells["colNhaCungCap"].Value?.ToString() ?? "";
-            txtGhiChu.Text = row.Cells["colTrangThai"].Value?.ToString() ?? "";
             
             if (DateTime.TryParse(row.Cells["colNgayNhap"].Value?.ToString(), out DateTime ngay))
                 dtpNgayNhap.Value = ngay;
@@ -232,7 +157,6 @@ namespace QLNhaThuoc.Form
             txtMaPhieu.Clear();
             txtNhanVien.Clear();
             txtNhaCungCap.Clear();
-            txtGhiChu.Clear();
             dtpNgayNhap.Value = DateTime.Now;
         }
 

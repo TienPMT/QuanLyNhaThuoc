@@ -20,33 +20,48 @@ namespace QLNhaThuoc.Form
             {
                 using (var db = new DbThuocContext())
                 {
-                    // Lấy dữ liệu từ bảng LoTonKho và kết hợp với SanPham
-                    var danhSachKho = db.LoTonKhos
-                        .Select(l => new
-                        {
-                            TenThuoc = l.SanPham.TenSanPham,
-                            l.SoLo,
-                            HanDung = l.HSD,
-                            SoLuong = l.SoLuongTon
-                        })
+                    // [CẬP NHẬT] Lấy tất cả sản phẩm, bao gồm cả sản phẩm có số lượng tồn = 0
+                    // Group by MaSanPham để tính tổng số lượng tồn kho của từng sản phẩm
+                    var danhSachKho = (from lo in db.LoTonKhos
+                                       group lo by new { lo.MaSanPham, lo.SanPham.TenSanPham } into g
+                                       select new
+                                       {
+                                           TenThuoc = g.Key.TenSanPham,
+                                           SoLo = g.Count() + " lô",
+                                           HanDung = (DateTime?)g.Min(x => x.HSD), // Lấy HSD gần nhất - cast to nullable
+                                           SoLuong = g.Sum(x => x.SoLuongTon ?? 0)
+                                       })
+                                       .ToList();
+
+                    // [MỚI] Thêm cả các sản phẩm chưa có trong kho (số lượng = 0)
+                    var sanPhamChuaCoKho = (from sp in db.SanPhams
+                                            where !db.LoTonKhos.Any(lo => lo.MaSanPham == sp.MaSanPham)
+                                            select new
+                                            {
+                                                TenThuoc = sp.TenSanPham,
+                                                SoLo = "0 lô",
+                                                HanDung = (DateTime?)null,
+                                                SoLuong = 0
+                                            })
+                                            .ToList();
+
+                    // Gộp 2 danh sách
+                    var danhSachKhoDay = danhSachKho
+                        .Concat(sanPhamChuaCoKho)
                         .OrderBy(x => x.TenThuoc)
                         .ToList();
 
                     // Thêm STT sau khi đã ToList()
-                    var danhSachKhoVoiSTT = danhSachKho.Select((l, index) => new
+                    var danhSachKhoVoiSTT = danhSachKhoDay.Select((l, index) => new
                     {
                         STT = index + 1,
                         l.TenThuoc,
                         l.SoLo,
-                        l.HanDung,
+                        HanDung = l.HanDung.HasValue ? l.HanDung.Value.ToString("dd/MM/yyyy") : "N/A",
                         l.SoLuong
                     }).ToList();
 
                     dgvKhoHang.DataSource = danhSachKhoVoiSTT;
-
-                    // Format cột hạn dùng
-                    if (colHanDung != null)
-                        colHanDung.DefaultCellStyle.Format = "dd/MM/yyyy";
                 }
             }
             catch (Exception ex)
@@ -94,33 +109,50 @@ namespace QLNhaThuoc.Form
             {
                 using (var db = new DbThuocContext())
                 {
-                    var danhSachKho = db.LoTonKhos
-                        .Where(l => l.SanPham.TenSanPham.ToLower().Contains(keyword) || 
-                                    l.SoLo.ToLower().Contains(keyword))
-                        .Select(l => new
-                        {
-                            TenThuoc = l.SanPham.TenSanPham,
-                            l.SoLo,
-                            HanDung = l.HSD,
-                            SoLuong = l.SoLuongTon
-                        })
+                    // [CẬP NHẬT] Tìm kiếm cũng bao gồm sản phẩm có số lượng = 0
+                    var danhSachKho = (from lo in db.LoTonKhos
+                                       where lo.SanPham.TenSanPham.ToLower().Contains(keyword) ||
+                                             (lo.SoLo != null && lo.SoLo.ToLower().Contains(keyword))
+                                       group lo by new { lo.MaSanPham, lo.SanPham.TenSanPham } into g
+                                       select new
+                                       {
+                                           TenThuoc = g.Key.TenSanPham,
+                                           SoLo = g.Count() + " lô",
+                                           HanDung = (DateTime?)g.Min(x => x.HSD), // Cast to nullable
+                                           SoLuong = g.Sum(x => x.SoLuongTon ?? 0)
+                                       })
+                                       .ToList();
+
+                    // [MỚI] Tìm kiếm cả sản phẩm chưa có trong kho
+                    var sanPhamChuaCoKho = (from sp in db.SanPhams
+                                            where sp.TenSanPham.ToLower().Contains(keyword) &&
+                                                  !db.LoTonKhos.Any(lo => lo.MaSanPham == sp.MaSanPham)
+                                            select new
+                                            {
+                                                TenThuoc = sp.TenSanPham,
+                                                SoLo = "0 lô",
+                                                HanDung = (DateTime?)null,
+                                                SoLuong = 0
+                                            })
+                                            .ToList();
+
+                    // Gộp 2 danh sách
+                    var danhSachKhoDay = danhSachKho
+                        .Concat(sanPhamChuaCoKho)
                         .OrderBy(x => x.TenThuoc)
                         .ToList();
 
                     // Thêm STT sau khi đã ToList()
-                    var danhSachKhoVoiSTT = danhSachKho.Select((l, index) => new
+                    var danhSachKhoVoiSTT = danhSachKhoDay.Select((l, index) => new
                     {
                         STT = index + 1,
                         l.TenThuoc,
                         l.SoLo,
-                        l.HanDung,
+                        HanDung = l.HanDung.HasValue ? l.HanDung.Value.ToString("dd/MM/yyyy") : "N/A",
                         l.SoLuong
                     }).ToList();
 
                     dgvKhoHang.DataSource = danhSachKhoVoiSTT;
-
-                    if (colHanDung != null)
-                        colHanDung.DefaultCellStyle.Format = "dd/MM/yyyy";
                 }
             }
             catch (Exception ex)

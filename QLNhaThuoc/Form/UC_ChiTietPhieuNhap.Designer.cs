@@ -28,7 +28,6 @@
             this.cboNhaCungCap = new System.Windows.Forms.ComboBox();
             this.lblNhanVien = new System.Windows.Forms.Label();
             this.lblGhiChu = new System.Windows.Forms.Label();
-            this.txtGhiChu = new System.Windows.Forms.TextBox();
             this.panelInput = new System.Windows.Forms.Panel();
             this.lblChonThuoc = new System.Windows.Forms.Label();
             this.cboThuoc = new System.Windows.Forms.ComboBox();
@@ -49,6 +48,7 @@
             this.txtTongTien = new System.Windows.Forms.TextBox();
             this.btnLuu = new System.Windows.Forms.Button();
             this.btnQuayLai = new System.Windows.Forms.Button();
+            this.cboTrangThai = new System.Windows.Forms.ComboBox();
             this.grpMaster.SuspendLayout();
             this.panelInput.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvChiTiet)).BeginInit();
@@ -69,6 +69,7 @@
             // 
             // grpMaster
             // 
+            this.grpMaster.Controls.Add(this.cboTrangThai);
             this.grpMaster.Controls.Add(this.txtNhanVien);
             this.grpMaster.Controls.Add(this.lblMaPhieu);
             this.grpMaster.Controls.Add(this.txtMaPhieu);
@@ -78,7 +79,6 @@
             this.grpMaster.Controls.Add(this.cboNhaCungCap);
             this.grpMaster.Controls.Add(this.lblNhanVien);
             this.grpMaster.Controls.Add(this.lblGhiChu);
-            this.grpMaster.Controls.Add(this.txtGhiChu);
             this.grpMaster.Dock = System.Windows.Forms.DockStyle.Top;
             this.grpMaster.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
             this.grpMaster.Location = new System.Drawing.Point(20, 60);
@@ -166,13 +166,6 @@
             this.lblGhiChu.Size = new System.Drawing.Size(92, 23);
             this.lblGhiChu.TabIndex = 8;
             this.lblGhiChu.Text = "Trạng thái";
-            // 
-            // txtGhiChu
-            // 
-            this.txtGhiChu.Location = new System.Drawing.Point(140, 117);
-            this.txtGhiChu.Name = "txtGhiChu";
-            this.txtGhiChu.Size = new System.Drawing.Size(660, 30);
-            this.txtGhiChu.TabIndex = 9;
             // 
             // panelInput
             // 
@@ -395,6 +388,15 @@
             this.btnQuayLai.Text = "Quay Lại";
             this.btnQuayLai.UseVisualStyleBackColor = false;
             // 
+            // cboTrangThai
+            // 
+            this.cboTrangThai.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cboTrangThai.FormattingEnabled = true;
+            this.cboTrangThai.Location = new System.Drawing.Point(140, 120);
+            this.cboTrangThai.Name = "cboTrangThai";
+            this.cboTrangThai.Size = new System.Drawing.Size(250, 31);
+            this.cboTrangThai.TabIndex = 11;
+            // 
             // UC_ChiTietPhieuNhap
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -425,7 +427,7 @@
         private System.Windows.Forms.Label lblTitle;
         private System.Windows.Forms.GroupBox grpMaster;
         private System.Windows.Forms.Label lblMaPhieu, lblNgayNhap, lblNhaCungCap, lblNhanVien, lblGhiChu;
-        private System.Windows.Forms.TextBox txtMaPhieu, txtGhiChu, txtNhanVien;
+        private System.Windows.Forms.TextBox txtMaPhieu, txtNhanVien;
         private System.Windows.Forms.DateTimePicker dtpNgayNhap;
         private System.Windows.Forms.ComboBox cboNhaCungCap;
 
@@ -443,5 +445,6 @@
         private System.Windows.Forms.Label lblTongTien;
         private System.Windows.Forms.TextBox txtTongTien;
         private System.Windows.Forms.Button btnLuu, btnQuayLai;
+        private System.Windows.Forms.ComboBox cboTrangThai;
     }
 }

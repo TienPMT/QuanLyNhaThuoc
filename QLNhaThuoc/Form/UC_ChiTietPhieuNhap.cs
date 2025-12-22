@@ -12,6 +12,7 @@ namespace QLNhaThuoc.Form
     public partial class UC_ChiTietPhieuNhap : UserControl
     {
         private bool isEditMode = false;
+        private string trangThaiCu = ""; // Lưu trạng thái cũ để so sánh
 
         // [MỚI] Event để thông báo khi dữ liệu được lưu thành công
         public event EventHandler DataSaved;
@@ -38,6 +39,11 @@ namespace QLNhaThuoc.Form
                     cboThuoc.DisplayMember = "TenSanPham";
                     cboThuoc.ValueMember = "MaSanPham";
                     cboThuoc.SelectedIndex = -1;
+
+                    // [MỚI] Load ComboBox Trạng Thái
+                    cboTrangThai.Items.Clear();
+                    cboTrangThai.Items.Add("Chờ duyệt");
+                    cboTrangThai.Items.Add("Đã nhập kho");
 
                     // [CẬP NHẬT] Hiển thị thông tin nhân viên đăng nhập
                     if (UserSession.IsLoggedIn)
@@ -70,15 +76,17 @@ namespace QLNhaThuoc.Form
                 dtpNgayNhap.Value = DateTime.Now;
 
                 // [CẬP NHẬT] Phân quyền trạng thái dựa trên vai trò
-                if (UserSession.VaiTro == "Quản lý")
+                // Nhân viên không phải Quản lý: luôn là "Chờ duyệt" và không được sửa
+                if (UserSession.VaiTro != "Quản lý")
                 {
-                    txtGhiChu.Text = "Chờ duyệt";
-                    txtGhiChu.Enabled = true; // Quản lý có thể sửa trạng thái
+                    cboTrangThai.SelectedIndex = 0; // Chờ duyệt
+                    cboTrangThai.Enabled = false;
                 }
                 else
                 {
-                    txtGhiChu.Text = "Chờ duyệt";
-                    txtGhiChu.Enabled = false; // Nhân viên không được sửa trạng thái
+                    // Quản lý có thể chọn trạng thái
+                    cboTrangThai.SelectedIndex = 0; // Mặc định là Chờ duyệt
+                    cboTrangThai.Enabled = true;
                 }
             }
             else
@@ -88,9 +96,6 @@ namespace QLNhaThuoc.Form
                 lblTitle.Text = "CẬP NHẬT PHIẾU NHẬP";
                 txtMaPhieu.Text = maPhieu;
                 txtMaPhieu.ReadOnly = true;
-
-                // [CẬP NHẬT] Chỉ Quản lý mới được sửa trạng thái khi edit
-                txtGhiChu.Enabled = (UserSession.VaiTro == "Quản lý");
 
                 LoadDataToForm(maPhieu);
             }
@@ -117,7 +122,35 @@ namespace QLNhaThuoc.Form
                         }
                         
                         cboNhaCungCap.SelectedValue = pn.MaNCC;
-                        txtGhiChu.Text = pn.TrangThai;
+                        
+                        // [MỚI] Load trạng thái vào ComboBox
+                        trangThaiCu = pn.TrangThai ?? "Chờ duyệt";
+                        int indexTrangThai = cboTrangThai.Items.IndexOf(trangThaiCu);
+                        if (indexTrangThai >= 0)
+                        {
+                            cboTrangThai.SelectedIndex = indexTrangThai;
+                        }
+
+                        // [MỚI] Kiểm tra quyền và trạng thái để enable/disable controls
+                        if (trangThaiCu == "Đã nhập kho")
+                        {
+                            // Nếu đã nhập kho -> không cho sửa chi tiết dù là ai
+                            DisableAllControls();
+                            MessageBox.Show("Phiếu nhập đã được nhập kho, không thể chỉnh sửa!", 
+                                "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        else
+                        {
+                            // Nếu chưa nhập kho -> phân quyền
+                            if (UserSession.VaiTro == "Quản lý")
+                            {
+                                cboTrangThai.Enabled = true;
+                            }
+                            else
+                            {
+                                cboTrangThai.Enabled = false; // Nhân viên không được đổi trạng thái
+                            }
+                        }
 
                         var details = (from ct in pn.ChiTietPhieuNhaps
                                        join sp in db.SanPhams on ct.MaSanPham equals sp.MaSanPham
@@ -135,6 +168,26 @@ namespace QLNhaThuoc.Form
             catch (Exception ex)
             {
                 MessageBox.Show("Lỗi tải dữ liệu chi tiết: " + ex.Message);
+            }
+        }
+
+        // [MỚI] Disable tất cả controls khi phiếu đã nhập kho
+        private void DisableAllControls()
+        {
+            cboNhaCungCap.Enabled = false;
+            cboThuoc.Enabled = false;
+            txtSoLuong.Enabled = false;
+            txtDonGia.Enabled = false;
+            btnThemSP.Enabled = false;
+            btnLuu.Enabled = false;
+            cboTrangThai.Enabled = false;
+            dgvChiTiet.ReadOnly = true;
+            dgvChiTiet.AllowUserToDeleteRows = false;
+            
+            // Ẩn cột xóa
+            if (colXoa != null)
+            {
+                colXoa.Visible = false;
             }
         }
 
@@ -267,6 +320,9 @@ namespace QLNhaThuoc.Form
                 MessageBox.Show("Vui lòng nhập ít nhất 1 sản phẩm!"); return;
             }
 
+            // [MỚI] Kiểm tra trạng thái
+            string trangThaiMoi = cboTrangThai.SelectedItem?.ToString() ?? "Chờ duyệt";
+
             try
             {
                 using (var db = new DbThuocContext())
@@ -280,14 +336,13 @@ namespace QLNhaThuoc.Form
 
                         pn.NgayNhap = dtpNgayNhap.Value;
                         pn.MaNCC = cboNhaCungCap.SelectedValue.ToString();
-                        pn.MaNhanVien = UserSession.MaNhanVien; // [CẬP NHẬT] Sử dụng mã nhân viên đăng nhập
+                        pn.MaNhanVien = UserSession.MaNhanVien;
                         
                         // [CẬP NHẬT] Trạng thái: Quản lý có thể sửa, nhân viên giữ nguyên
                         if (UserSession.VaiTro == "Quản lý")
                         {
-                            pn.TrangThai = txtGhiChu.Text;
+                            pn.TrangThai = trangThaiMoi;
                         }
-                        // Nếu không phải Quản lý thì giữ nguyên trạng thái cũ
 
                         var oldDetails = db.ChiTietPhieuNhaps.Where(x => x.MaPhieuNhap == pn.MaPhieuNhap);
                         db.ChiTietPhieuNhaps.RemoveRange(oldDetails);
@@ -298,12 +353,12 @@ namespace QLNhaThuoc.Form
                         pn.MaPhieuNhap = txtMaPhieu.Text;
                         pn.NgayNhap = dtpNgayNhap.Value;
                         pn.MaNCC = cboNhaCungCap.SelectedValue.ToString();
-                        pn.MaNhanVien = UserSession.MaNhanVien; // [CẬP NHẬT] Sử dụng mã nhân viên đăng nhập
+                        pn.MaNhanVien = UserSession.MaNhanVien;
 
                         // [CẬP NHẬT] Trạng thái khi thêm mới
                         if (UserSession.VaiTro == "Quản lý")
                         {
-                            pn.TrangThai = txtGhiChu.Text; // Quản lý có thể tự đặt trạng thái
+                            pn.TrangThai = trangThaiMoi;
                         }
                         else
                         {
@@ -328,6 +383,12 @@ namespace QLNhaThuoc.Form
                     }
                     pn.TongTien = tongTienDB;
 
+                    // [MỚI] Nếu trạng thái là "Đã nhập kho", cập nhật tồn kho
+                    if (pn.TrangThai == "Đã nhập kho")
+                    {
+                        CapNhatTonKho(db, pn.MaPhieuNhap);
+                    }
+
                     db.SaveChanges();
                     MessageBox.Show("Lưu dữ liệu thành công!");
 
@@ -341,6 +402,75 @@ namespace QLNhaThuoc.Form
             {
                 string msg = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
                 MessageBox.Show("Lỗi khi lưu: " + msg);
+            }
+        }
+
+        // [MỚI] Cập nhật tồn kho khi phiếu nhập được duyệt
+        private void CapNhatTonKho(DbThuocContext db, string maPhieuNhap)
+        {
+            try
+            {
+                var chiTietPhieuNhap = db.ChiTietPhieuNhaps.Where(ct => ct.MaPhieuNhap == maPhieuNhap).ToList();
+
+                foreach (var ct in chiTietPhieuNhap)
+                {
+                    // Kiểm tra xem đã có lô tồn kho cho sản phẩm này chưa
+                    var loTonKho = db.LoTonKhos
+                        .Where(l => l.MaSanPham == ct.MaSanPham)
+                        .OrderByDescending(l => l.NgayNhap)
+                        .FirstOrDefault();
+
+                    if (loTonKho != null)
+                    {
+                        // Nếu đã có, tăng số lượng tồn
+                        loTonKho.SoLuongTon = (loTonKho.SoLuongTon ?? 0) + ct.SoLuong;
+                        loTonKho.NgayNhap = DateTime.Now;
+                    }
+                    else
+                    {
+                        // Nếu chưa có, tạo mới lô tồn kho
+                        var loMoi = new LoTonKho
+                        {
+                            MaLoTonKho = TaoMaLoTonKho(db),
+                            MaSanPham = ct.MaSanPham,
+                            SoLo = "LO" + DateTime.Now.ToString("yyMMdd"),
+                            HSD = DateTime.Now.AddYears(2), // Mặc định HSD 2 năm
+                            SoLuongTon = ct.SoLuong,
+                            NgayNhap = DateTime.Now
+                        };
+                        db.LoTonKhos.Add(loMoi);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Lỗi cập nhật tồn kho: " + ex.Message);
+            }
+        }
+
+        // [MỚI] Tạo mã lô tồn kho tự động
+        private string TaoMaLoTonKho(DbThuocContext db)
+        {
+            try
+            {
+                var lastLo = db.LoTonKhos
+                    .OrderByDescending(l => l.MaLoTonKho)
+                    .FirstOrDefault();
+
+                if (lastLo != null && lastLo.MaLoTonKho.Length > 2)
+                {
+                    string numPart = lastLo.MaLoTonKho.Substring(2);
+                    if (int.TryParse(numPart, out int number))
+                    {
+                        return "LO" + (number + 1).ToString("D6");
+                    }
+                }
+
+                return "LO000001";
+            }
+            catch
+            {
+                return "LO" + DateTime.Now.ToString("yyMMddHHmmss");
             }
         }
 
@@ -388,12 +518,29 @@ namespace QLNhaThuoc.Form
         private void ResetForm()
         {
             txtMaPhieu.Clear();
-            txtGhiChu.Clear();
             cboNhaCungCap.SelectedIndex = -1;
             dgvChiTiet.Rows.Clear();
             txtTongTien.Text = "0";
             txtSoLuong.Text = "";
             txtDonGia.Text = "";
+            
+            // [MỚI] Reset ComboBox trạng thái
+            cboTrangThai.SelectedIndex = 0;
+            cboTrangThai.Enabled = true;
+            
+            // Reset lại các controls
+            cboNhaCungCap.Enabled = true;
+            cboThuoc.Enabled = true;
+            txtSoLuong.Enabled = true;
+            txtDonGia.Enabled = true;
+            btnThemSP.Enabled = true;
+            btnLuu.Enabled = true;
+            dgvChiTiet.ReadOnly = false;
+            dgvChiTiet.AllowUserToDeleteRows = true;
+            if (colXoa != null)
+            {
+                colXoa.Visible = true;
+            }
             
             // [CẬP NHẬT] Hiển thị lại tên nhân viên đăng nhập
             if (UserSession.IsLoggedIn)

@@ -156,6 +156,54 @@ namespace QLNhaThuoc.Form
             // 3. Xử lý Grid
             if (dgvGioHang != null)
             {
+                // Validation khi thay đổi số lượng
+                dgvGioHang.CellValidating += (s, e) => {
+                    if (e.RowIndex >= 0 && e.ColumnIndex == colSL.Index)
+                    {
+                        var row = dgvGioHang.Rows[e.RowIndex];
+                        if (row.IsNewRow) return;
+
+                        string newValue = e.FormattedValue?.ToString();
+                        
+                        // Kiểm tra nếu nhập 0 hoặc trống
+                        if (string.IsNullOrWhiteSpace(newValue) || newValue == "0")
+                        {
+                            MessageBox.Show("Số lượng không được bằng 0!", "Cảnh báo", 
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            e.Cancel = true;
+                            return;
+                        }
+
+                        // Kiểm tra tồn kho
+                        if (int.TryParse(newValue, out int soLuongMoi))
+                        {
+                            string tenThuoc = row.Cells[colTenThuoc.Index].Value?.ToString();
+                            if (!string.IsNullOrEmpty(tenThuoc))
+                            {
+                                using (var db = new DbThuocContext())
+                                {
+                                    var sanPham = db.SanPhams.FirstOrDefault(sp => sp.TenSanPham == tenThuoc);
+                                    if (sanPham != null)
+                                    {
+                                        // Tính tổng số lượng tồn kho
+                                        int tongTonKho = db.LoTonKhos
+                                            .Where(l => l.MaSanPham == sanPham.MaSanPham)
+                                            .Sum(l => l.SoLuongTon ?? 0);
+
+                                        if (soLuongMoi > tongTonKho)
+                                        {
+                                            MessageBox.Show($"Tồn kho không đủ! Số lượng tồn kho hiện tại: {tongTonKho}", 
+                                                "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                            e.Cancel = true;
+                                            return;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                };
+
                 dgvGioHang.CellValueChanged += (s, e) => {
                     if (e.RowIndex >= 0 && e.ColumnIndex == colSL.Index)
                     {
@@ -196,6 +244,22 @@ namespace QLNhaThuoc.Form
                             dgvGioHang.Rows.RemoveAt(e.RowIndex);
                             CapNhatSTT();
                             CapNhatTongTien();
+                            
+                            // [MỚI] Kiểm tra nếu giỏ hàng trống sau khi xóa
+                            int demDongThucTe = 0;
+                            foreach (DataGridViewRow r in dgvGioHang.Rows)
+                            {
+                                if (!r.IsNewRow)
+                                {
+                                    demDongThucTe++;
+                                }
+                            }
+                            
+                            if (demDongThucTe == 0)
+                            {
+                                MessageBox.Show("Giỏ hàng đã trống!", "Thông báo", 
+                                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            }
                         }
                     }
                 };
@@ -209,9 +273,18 @@ namespace QLNhaThuoc.Form
                 };
             }
 
-            // 4. Giảm giá thay đổi
+            // 4. [CẬP NHẬT] Giảm giá - chỉ cho phép nhập số
             if (txtGiamGia != null)
             {
+                // Thêm KeyPress event để chỉ cho phép nhập số
+                txtGiamGia.KeyPress += (s, e) => {
+                    // Cho phép: số, phím điều khiển (Backspace, Delete, etc.)
+                    if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
+                    {
+                        e.Handled = true; // Chặn ký tự không hợp lệ
+                    }
+                };
+                
                 txtGiamGia.TextChanged += (s, e) => CapNhatTongTien();
             }
 
@@ -301,6 +374,18 @@ namespace QLNhaThuoc.Form
                         return;
                     }
 
+                    // Kiểm tra tồn kho trước khi thêm
+                    int tongTonKho = db.LoTonKhos
+                        .Where(l => l.MaSanPham == thuoc.MaSanPham)
+                        .Sum(l => l.SoLuongTon ?? 0);
+
+                    if (tongTonKho <= 0)
+                    {
+                        MessageBox.Show("Tồn kho không đủ! Sản phẩm này đã hết hàng.", 
+                            "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
                     // Kiểm tra trùng
                     foreach (DataGridViewRow row in dgvGioHang.Rows)
                     {
@@ -308,7 +393,17 @@ namespace QLNhaThuoc.Form
                         if (row.Cells[colTenThuoc.Index].Value?.ToString() == thuoc.TenSanPham)
                         {
                             int slHienTai = Convert.ToInt32(row.Cells[colSL.Index].Value ?? 0);
-                            row.Cells[colSL.Index].Value = slHienTai + 1;
+                            int slMoi = slHienTai + 1;
+
+                            // Kiểm tra tồn kho khi tăng số lượng
+                            if (slMoi > tongTonKho)
+                            {
+                                MessageBox.Show($"Tồn kho không đủ! Số lượng tồn kho hiện tại: {tongTonKho}", 
+                                    "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                return;
+                            }
+
+                            row.Cells[colSL.Index].Value = slMoi;
                             TinhLaiThanhTienRow(row.Index);
                             CapNhatTongTien();
                             ResetTimKiem();
@@ -392,10 +487,19 @@ namespace QLNhaThuoc.Form
 
         private void XuLyThanhToan()
         {
-            // Validate
-            if (dgvGioHang.Rows.Count == 0)
+            // [CẬP NHẬT] Validate - Kiểm tra giỏ hàng có sản phẩm thực tế không
+            int demDongThucTe = 0;
+            foreach (DataGridViewRow row in dgvGioHang.Rows)
             {
-                MessageBox.Show("Giỏ hàng trống!", "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                if (!row.IsNewRow)
+                {
+                    demDongThucTe++;
+                }
+            }
+            
+            if (demDongThucTe == 0)
+            {
+                MessageBox.Show("Giỏ hàng đã trống!", "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
